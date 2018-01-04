@@ -40,8 +40,6 @@ public final class MeasurementSingleton {
     private long serverStartUptime;
 
     private MeasurementSingleton() {
-        System.out.println(runtimeMXBean.getUptime());
-        System.out.println(System.currentTimeMillis() - VM_START_TIME);
         Runtime.getRuntime().addShutdownHook(new Thread(() -> {
             Path p = Paths.get("log.csv");
             File file = p.toFile();
