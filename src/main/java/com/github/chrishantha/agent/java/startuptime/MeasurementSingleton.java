@@ -68,7 +68,8 @@ public final class MeasurementSingleton {
 
     private String getHeader() {
         return String.join(",", "Agent Startup Time (ms)", "Agent Entry Uptime (ms)",
-                "Agent Duration (ms)", "Class Transformation Duration (ms),Server Startup Time (ms),Server Start Uptime (ms),Server Startup Duration (ms)");
+                "Agent Duration (ms)", "Class Transformation Duration (ms)", "Server Startup Time (ms)",
+                "Server Start Uptime (ms)", "Server Startup Duration (ms)");
     }
 
     private String getValues() {

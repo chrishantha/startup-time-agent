@@ -1,100 +1,92 @@
 package com.github.chrishantha.agent.java.startuptime;
 
+import javassist.CannotCompileException;
 import javassist.ClassPool;
 import javassist.CtClass;
 import javassist.CtMethod;
+import javassist.NotFoundException;
 
+import java.io.IOException;
 import java.lang.instrument.Instrumentation;
 import java.util.concurrent.TimeUnit;
 
 public class Agent {
 
-    private static final String NETTY_CLASS = "io/netty/bootstrap/AbstractBootstrap";
+    private static final String CODE_STRING = "{com.github.chrishantha.agent.java.startuptime." +
+            "MeasurementSingleton.getInstance().serverStarted();}";
+
+    private static final String NETTY_CLASS_STRING = "io/netty/bootstrap/AbstractBootstrap";
+
+    private static final String SPRING_TOMCAT_CLASS_STRING = "org/springframework/boot/context/embedded/tomcat/TomcatEmbeddedServletContainer";
+
+    private enum ServerType {
+        NETTY,
+        SPRING_BOOT
+    }
 
     public static void premain(String agentArgs, Instrumentation inst) {
+        ServerType serverType = ServerType.NETTY;
+        if (agentArgs != null) {
+            serverType = ServerType.valueOf(agentArgs.toUpperCase());
+        }
+
+        final String CLASS_STRING;
+
+        switch (serverType) {
+            case NETTY:
+                CLASS_STRING = NETTY_CLASS_STRING;
+                break;
+            case SPRING_BOOT:
+                CLASS_STRING = SPRING_TOMCAT_CLASS_STRING;
+                break;
+            default:
+                CLASS_STRING = NETTY_CLASS_STRING;
+        }
+
+
         MeasurementSingleton.getInstance().premainEnter();
-//        long mainStartTime = System.currentTimeMillis();
-//        long vmStartTime = ManagementFactory.getRuntimeMXBean().getStartTime();
-//        long mainUptime = ManagementFactory.getRuntimeMXBean().getUptime();
-//        System.out.println(String.format("Agent - VM Start Time: %d", vmStartTime));
-//        System.out.println(String.format("Agent - Main Start Time: %d", mainStartTime));
-//        System.out.println(String.format("Agent - Main Uptime (ms): %d", mainUptime));
-//        System.out.println(String.format("Agent - VM Startup Time (ms): %d", mainStartTime - vmStartTime));
-//        new AgentBuilder.Default()
-////                .with(AgentBuilder.Listener.StreamWriting.toSystemOut())
-////                .type(ElementMatchers.nameEndsWith("Address"))
-////                .type(ElementMatchers.nameStartsWith("java.net"))
-//                .disableClassFormatChanges()
-////                .with(AgentBuilder.RedefinitionStrategy.RETRANSFORMATION)
-//                .type(ElementMatchers.named("io.netty.bootstrap.AbstractBootstrap"))
-////                .transform((builder, typeDescription, classLoader, javaModule) ->
-////                        builder.method(ElementMatchers.named("bind").and(ElementMatchers.takesArguments(SocketAddress.class)))
-////                                .intercept(MethodDelegation.to(Interceptor.class) //.andThen(SuperMethodCall.INSTANCE)
-////                                ))
-//
-//                .transform((builder, typeDescription, classLoader, javaModule) ->
-//                        builder.visit(Advice.to(TimeAdvice.class)
-//                                .on(ElementMatchers.named("bind").and(ElementMatchers.takesArguments(SocketAddress.class)))))
-//                .installOn(inst);
-
-
-//        TypePool typePool = TypePool.Default.ofClassPath();
-//
-//        new ByteBuddy().rebase(typePool.describe("io.netty.bootstrap.AbstractBootstrap").resolve(),
-//                ClassFileLocator.ForClassLoader.ofClassPath())
-//                .method(ElementMatchers.named("bind").and(ElementMatchers.takesArguments(SocketAddress.class)))
-//                .intercept(MethodDelegation.to(Interceptor.class)).make().load(ClassLoader.getSystemClassLoader());
-
-
-//        LongAdder totalTime = new LongAdder();
-
+        // Javassist
+        ServerType finalServerType = serverType;
         inst.addTransformer((classLoader, s, aClass, protectionDomain, bytes) -> {
-            long startTime = System.nanoTime();
-            try {
-                if (NETTY_CLASS.equals(s)) {
-                    long start = System.nanoTime();
-//                    // Javassist
-                    try {
-                        ClassPool cp = ClassPool.getDefault();
-                        CtClass cc = cp.get("io.netty.bootstrap.AbstractBootstrap");
-                        CtMethod m = cc.getDeclaredMethod("bind", new CtClass[]{cp.get("java.net.SocketAddress")});
-//                        CtMethod m = cc.getDeclaredMethod("bind");
-//                    m.addLocalVariable("elapsedTime", CtClass.longType);
-//                    m.insertBefore("elapsedTime = System.currentTimeMillis();");
-//                    m.insertAfter("{elapsedTime = System.currentTimeMillis() - elapsedTime;"
-//                            + "System.out.println(\"Method Executed in ms: \" + elapsedTime);}");
-
-//                        m.insertAfter("{ System.out.println(\"Server started. Current Uptime (ms): \" + " +
-//                                "java.lang.management.ManagementFactory.getRuntimeMXBean().getUptime());}");
-
-                        m.insertAfter("{com.github.chrishantha.agent.java.startuptime." +
-                                "MeasurementSingleton.getInstance().serverStarted();}");
-                        byte[] byteCode = cc.toBytecode();
-                        cc.detach();
-                        return byteCode;
-                    } catch (Exception ex) {
-                        ex.printStackTrace();
-                    } finally {
-                        MeasurementSingleton.getInstance()
-                                .setClassTransformationDuration(TimeUnit.NANOSECONDS
-                                        .toMillis(System.nanoTime() - start));
-//                        System.out.println(String.format("Agent - Transformation Time (ms): %d", TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - start)));
+            if (CLASS_STRING.equals(s)) {
+                long start = System.nanoTime();
+                try {
+                    switch (finalServerType) {
+                        case NETTY:
+                            return getNettyClassByteCode();
+                        case SPRING_BOOT:
+                            return getSpringTomcatClassByteCode();
                     }
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                } finally {
+                    MeasurementSingleton.getInstance()
+                            .setClassTransformationDuration(TimeUnit.NANOSECONDS
+                                    .toMillis(System.nanoTime() - start));
                 }
-                return null;
-            } finally {
-//                totalTime.add(System.nanoTime() - startTime);
             }
+            return null;
         });
-//
-//        Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-//            long sum = totalTime.sum();
-//            System.out.println(String.format("Total Transformation Time: %d ms (%d ns)", TimeUnit.NANOSECONDS.toMillis(sum), sum));
-//        }));
-//
-//        System.out.println(String.format("Agent - Install Time (ms): %d", System.currentTimeMillis() - mainStartTime));
-//
-//        System.out.println(String.format("Agent - End Uptime (ms): %d", ManagementFactory.getRuntimeMXBean().getUptime()));
         MeasurementSingleton.getInstance().premainExit();
+    }
+
+    private static byte[] getNettyClassByteCode() throws NotFoundException, CannotCompileException, IOException {
+        ClassPool cp = ClassPool.getDefault();
+        CtClass cc = cp.get("io.netty.bootstrap.AbstractBootstrap");
+        CtMethod m = cc.getDeclaredMethod("bind", new CtClass[]{cp.get("java.net.SocketAddress")});
+        m.insertAfter(CODE_STRING);
+        byte[] byteCode = cc.toBytecode();
+        cc.detach();
+        return byteCode;
+    }
+
+    private static byte[] getSpringTomcatClassByteCode() throws NotFoundException, CannotCompileException, IOException {
+        ClassPool cp = ClassPool.getDefault();
+        CtClass cc = cp.get("org.springframework.boot.context.embedded.tomcat.TomcatEmbeddedServletContainer");
+        CtMethod m = cc.getDeclaredMethod("start");
+        m.insertAfter(CODE_STRING);
+        byte[] byteCode = cc.toBytecode();
+        cc.detach();
+        return byteCode;
     }
 }

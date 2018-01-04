@@ -56,12 +56,13 @@
     </repositories>
 
     <dependencies>
+        <!--
         <dependency>
             <groupId>net.bytebuddy</groupId>
             <artifactId>byte-buddy</artifactId>
             <version>${bytebuddy.version}</version>
         </dependency>
-<!--        <dependency>
+        <dependency>
             <groupId>org.testng</groupId>
             <artifactId>testng</artifactId>
             <version>${testng.version}</version>
@@ -77,11 +78,12 @@
             <groupId>net.bytebuddy</groupId>
             <artifactId>byte-buddy-agent</artifactId>
             <version>${bytebuddy.version}</version>
-        </dependency>-->
+        </dependency>
+        -->
         <dependency>
             <groupId>org.javassist</groupId>
             <artifactId>javassist</artifactId>
-            <version>3.22.0-GA</version>
+            <version>${javassist.version}</version>
         </dependency>
     </dependencies>
 
@@ -129,6 +131,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <javac.target>1.8</javac.target>
         <bytebuddy.version>1.7.9</bytebuddy.version>
+        <javassist.version>3.22.0-GA</javassist.version>
         <testng.version>6.13.1</testng.version>
         <mockito.version>2.13.0</mockito.version>
         <slf4j.version>1.7.25</slf4j.version>
